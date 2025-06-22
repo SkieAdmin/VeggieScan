@@ -10,6 +10,7 @@ dotenv.config();
 // LM Studio API endpoints
 const LM_STUDIO_BASE_URL = process.env.LM_STUDIO_BASE_URL;
 const LM_STUDIO_CHAT_ENDPOINT = process.env.LM_STUDIO_CHAT_ENDPOINT;
+const LM_MODEL = process.env.LM_MODEL || 'google/gemma-3-4b'; // Default to 4B model if not specified
 
 /**
  * Check if LM Studio server is available
@@ -94,7 +95,7 @@ If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and expl
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'google/gemma-3-4b',
+        model: LM_MODEL,
         messages: [
           {
             role: 'user',
