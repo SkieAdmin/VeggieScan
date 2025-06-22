@@ -1,160 +1,108 @@
-# VeggieScan: Visual Diagnosis of Vegetable Freshness and Contamination
+# VeggieScan System
 
-A comprehensive system for analyzing vegetable freshness and detecting contamination using AI-powered image analysis.
+Visual Diagnosis of Vegetable Freshness and Contamination
 
-## 🌟 Features
+## Research Capstone Project
+**St. Michael's College of Iligan (A.Y 2025-2026)**
 
-### For Consumers
-- **Dashboard**: View scan statistics (good vs bad vegetables)
-- **Vegetable Scanner**: Upload/capture images with real-time progress tracking
-- **History**: Track all previous scans with detailed results
-- **Settings**: Manage account and app preferences
+### Development Team
+* **Lead Developer:** Kerneil Rommel S. Gocotano
+* **Research:** John Michael S. Abiol
 
-### For System Administrators
-- **Admin Dashboard**: System-wide statistics and user management
-- **User Management**: View and manage all registered users
-- **System Status**: Monitor API, LM Studio, and database health
-- **Dataset Management**: Export and manage the vegetable dataset
+## Project Overview
 
-## 🏗️ Architecture
+VeggieScan is a system that uses AI to analyze images of vegetables and determine their freshness and potential contamination. The system provides recommendations based on the analysis results.
 
-- **Backend**: Python FastAPI with SQLite database
-- **Frontend**: React Native mobile application
-- **AI Engine**: LM Studio (google/gemma-3-4b) for image analysis
-- **Dataset**: Automatic dataset creation for reinforcement learning
+## Architecture
 
-## 📱 AI Analysis Features
+- **Backend**: NodeJS (ES6 Module) with Express
+- **Frontend**: ReactJS with Material-UI
+- **Database**: MariaDB with Prisma ORM
+- **AI Integration**: LM Studio API with fallback dataset
+- **Authentication**: JWT-based authentication with role-based access control
 
-The system provides detailed analysis for each vegetable image:
+## Project Structure
 
-```json
-{
-  "vegetable_name": "Potato",
-  "safe_to_eat": true,
-  "disease_name": null,
-  "recommendation": "Just cook it"
-}
-```
+- `/backend` - NodeJS backend server
+  - `/src` - Source code
+    - `/controllers` - API route controllers
+    - `/middleware` - Authentication and validation middleware
+    - `/models` - Database models with Prisma
+    - `/routes` - API route definitions
+    - `/utils` - Utility functions
+  - `/prisma` - Prisma schema and migrations
+  - `/uploads` - Image upload directory
 
-Special handling for:
-- Cut/damaged vegetables (marked as "Prone to Bacteria")
-- Invalid images (non-vegetable content)
-- Disease detection with specific recommendations
+- `/frontend` - React frontend application
+  - `/src` - Source code
+    - `/components` - Reusable UI components
+    - `/contexts` - React context providers (Auth, Theme)
+    - `/layouts` - Page layout components
+    - `/pages` - Application pages
+      - `/auth` - Authentication pages (Login, Register)
+      - `/user` - User pages (Dashboard, Scan Upload, History, etc.)
+      - `/admin` - Admin pages (Dashboard, User Management, etc.)
+    - `/services` - API service functions
+    - `/utils` - Utility functions
 
-## 🚀 Quick Start
+## Setup Instructions
 
 ### Backend Setup
-```bash
-cd backend
-pip install -r requirements.txt
-python main.py
-```
+
+1. Navigate to the backend directory: `cd backend`
+2. Install dependencies: `npm install`
+3. Configure environment variables in `.env`:
+   ```
+   DATABASE_URL="mysql://user:password@localhost:3306/veggiescan"
+   JWT_SECRET="your-secret-key"
+   PORT=3001
+   ```
+4. Run database migrations: `npx prisma migrate dev`
+5. Start the server: `npm start` or `npm run dev` for development
 
 ### Frontend Setup
-```bash
-cd frontend
-npm install
-npx react-native run-android  # or run-ios
-```
 
-### LM Studio Configuration
-- Ensure LM Studio is running at: `http://26.165.143.148:1234`
-- Model: `google/gemma-3-4b`
+1. Navigate to the frontend directory: `cd frontend`
+2. Install dependencies: `npm install`
+3. Configure environment variables in `.env` if needed
+4. Start the development server: `npm start`
 
-## 📊 Dataset & Reinforcement Learning
+### LM Studio Setup
 
-The system automatically:
-1. Checks existing dataset before calling LM Studio
-2. Saves all scan results to build a comprehensive dataset
-3. Enables dataset export for sharing and further training
-4. Improves accuracy over time through reinforcement learning
+1. Install LM Studio from [https://lmstudio.ai/](https://lmstudio.ai/)
+2. Load the gemma-3-4b model
+3. Start the local server on port 1234
+4. Configure the API URL in the admin settings
 
-## 🔐 User Types
+## Features
 
-### Consumer Account
-- Personal dashboard with individual statistics
-- Scan history limited to own scans
-- Basic settings and profile management
+### User Features
 
-### Admin Account
-- System-wide dashboard and statistics
-- User management capabilities
-- System health monitoring
-- Dataset management and export
+- **Authentication**: Secure login and registration
+- **Dashboard**: Overview of scan statistics and recent activity
+- **Scan Upload**: Upload vegetable images with drag-and-drop functionality
+  - Real-time upload progress tracking
+  - AI-powered analysis with LM Studio
+  - Fallback to dataset when AI is unavailable
+- **Scan History**: View past scans with search and filtering
+- **Scan Details**: Detailed view of analysis results
+- **User Settings**: Profile management, password changes, and notification preferences
 
-## 🛠️ Technology Stack
+### Admin Features
 
-- **Backend**: FastAPI, SQLAlchemy, SQLite, Python-Jose, Passlib
-- **Frontend**: React Native, React Navigation, React Native Paper
-- **AI**: LM Studio API integration
-- **Authentication**: JWT tokens with bcrypt password hashing
-- **Database**: SQLite with automatic migrations
+- **Admin Dashboard**: System-wide statistics and monitoring
+- **User Management**: View, add, edit, and delete users
+- **Scan Management**: View and manage all scans in the system
+- **System Status**: Monitor LM Studio API, database, and system resources
+- **Admin Settings**: Configure system-wide settings
 
-## 📝 API Endpoints
+### Technical Features
 
-### Authentication
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-
-### Core Features
-- `POST /scan` - Analyze vegetable image
-- `GET /dashboard` - Get dashboard statistics
-- `GET /history` - Get scan history
-
-### Admin Only
-- `GET /admin/users` - Get all users
-- `GET /admin/system-status` - Get system health
-- `GET /dataset` - Get vegetable dataset
-
-## 🔧 Configuration
-
-### Environment Variables (.env)
-```
-SECRET_KEY=your-secret-key-change-this-in-production
-LM_STUDIO_BASE_URL=http://26.165.143.148:1234/v1
-DATABASE_URL=sqlite:///./veggie_scan.db
-```
-
-### Frontend Configuration (src/config/api.js)
-```javascript
-export const API_BASE_URL = 'http://localhost:8000';
-```
-
-## 📱 Mobile App Features
-
-- **Image Capture**: Camera and gallery integration
-- **Progress Tracking**: Real-time upload and analysis progress
-- **Offline Support**: Basic functionality when network is limited
-- **Modern UI**: Material Design with React Native Paper
-- **Cross-Platform**: Works on both Android and iOS
-
-## 🎯 Future Enhancements
-
-- Image similarity matching for faster dataset lookups
-- Advanced disease classification
-- Batch processing for multiple vegetables
-- Export functionality for scan reports
-- Push notifications for scan completion
-- Multi-language support
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 📞 Support
-
-For support and questions:
-- Email: support@veggiescan.com
-- Create an issue in the repository
-
----
-
-**VeggieScan** - Making food safety accessible through AI-powered visual analysis.
+- Responsive design for all device sizes
+- Dark/light theme toggle
+- Role-based access control
+- JWT authentication
+- Real-time progress indicators
+- Client-side form validation
+- Error handling and user feedback
+- Secure password storage

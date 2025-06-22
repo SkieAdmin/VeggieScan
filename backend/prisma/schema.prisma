@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scans     Scan[]
+  settings  Settings?
+}
+
+model Settings {
+  id                Int     @id @default(autoincrement())
+  userId            Int     @unique
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationsOn   Boolean @default(true)
+  darkModeEnabled   Boolean @default(false)
+  languagePreference String  @default("en")
+}
+
+model Scan {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vegetableName  String
+  isSafe         Boolean
+  diseaseName    String?
+  recommendation String   @db.Text
+  imagePath      String
+  createdAt      DateTime @default(now())
+}
+
+model Dataset {
+  id             Int      @id @default(autoincrement())
+  vegetableName  String
+  isSafe         Boolean
+  diseaseName    String?
+  recommendation String   @db.Text
+  imagePath      String?
+  createdAt      DateTime @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+}
