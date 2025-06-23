@@ -10,6 +10,7 @@ import scanRoutes from './routes/scans.js';
 import adminRoutes from './routes/admin.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createUploadsDirectory } from './utils/fileSystem.js';
+import { initWebSocketServer } from './services/websocketService.js';
 
 // Load environment variables
 dotenv.config();
@@ -47,12 +48,26 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// WebSocket status endpoint
+app.get('/api/websocket-status', (req, res) => {
+  try {
+    const { getWebSocketStatus } = require('./services/websocketService.js');
+    const status = getWebSocketStatus();
+    res.status(200).json(status);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get WebSocket status' });
+  }
+});
+
 // Error handling middleware
 app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Initialize WebSocket server if enabled
+  initWebSocketServer();
 });
 
 // Handle unhandled promise rejections

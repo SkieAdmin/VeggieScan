@@ -7,7 +7,6 @@ import {
   Grid,
   Button,
   Divider,
-  CircularProgress,
   Alert,
   List,
   ListItem,
@@ -16,7 +15,18 @@ import {
   Avatar,
   LinearProgress,
   Paper,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  useMediaQuery,
+  IconButton,
+  Collapse,
+  CircularProgress
 } from '@mui/material';
 import {
   CheckCircle,
@@ -30,26 +40,67 @@ import {
   Image,
   Person,
   Settings,
-  Sync
+  Sync,
+  Computer,
+  DeviceHub,
+  Devices,
+  PhoneAndroid,
+  ExpandMore,
+  ExpandLess,
+  Info
 } from '@mui/icons-material';
 import axios from 'axios';
 import moment from 'moment';
+import { getWebSocketStatus } from '../../services/websocketService';
+import VeggieLoader from '../../components/common/VeggieLoader';
+import WebSocketWorkerManager from '../../components/admin/WebSocketWorkerManager';
 import { useTheme } from '@mui/material/styles';
-import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Title, ChartTooltip, Legend);
 
 const SystemStatus = () => {
-  const [systemStatus, setSystemStatus] = useState(null);
+  // Initialize state with safe default values to prevent undefined errors
+  const [systemStatus, setSystemStatus] = useState({
+    resources: {
+      cpu: { usage: 0, cores: 0 },
+      memory: { used: 0, total: 0, usedPercent: 0 },
+      disk: { used: 0, total: 0, usedPercent: 0 },
+      uptime: '0 days, 0 hours'
+    },
+    database: { connected: false, version: '', size: 0 },
+    apiResponseTimes: [],
+    logs: [],
+    scanStats: { total: 0, successful: 0, failed: 0 },
+    userStats: { total: 0, active: 0, admin: 0 },
+    llm: { online: false, model: 'Unknown', avgResponseTime: 0, lastChecked: null, error: null },
+    storage: { totalFiles: 0, totalSize: 0, avgFileSize: 0 }
+  });
+  
+  const [wsStatus, setWsStatus] = useState({ workers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    workers: true,
+    apiResponse: true,
+    systemLogs: true
+  });
   
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   useEffect(() => {
     fetchSystemStatus();
+    fetchWebSocketStatus();
   }, []);
 
   const fetchSystemStatus = async () => {
@@ -65,33 +116,114 @@ const SystemStatus = () => {
       setLoading(false);
     }
   };
-
-  const handleRefresh = async () => {
+  
+  const fetchWebSocketStatus = async () => {
+    try {
+      const data = await getWebSocketStatus();
+      setWsStatus(data);
+    } catch (error) {
+      console.error('Error fetching WebSocket status:', error);
+      // Don't set the main error state, just log it
+    }
+  };
+  
+  const handleStartWorker = async (workerId) => {
     try {
       setRefreshing(true);
-      await fetchSystemStatus();
+      await axios.post(`/admin/websocket/workers/${workerId}/start`);
+      await fetchWebSocketStatus();
+    } catch (error) {
+      console.error('Error starting WebSocket worker:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  
+  const handleStopWorker = async (workerId) => {
+    try {
+      setRefreshing(true);
+      await axios.post(`/admin/websocket/workers/${workerId}/stop`);
+      await fetchWebSocketStatus();
+    } catch (error) {
+      console.error('Error stopping WebSocket worker:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  
+  const handleRestartWorker = async (workerId) => {
+    try {
+      setRefreshing(true);
+      await axios.post(`/admin/websocket/workers/${workerId}/restart`);
+      await fetchWebSocketStatus();
+    } catch (error) {
+      console.error('Error restarting WebSocket worker:', error);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const formatBytes = (bytes, decimals = 2) => {
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await Promise.all([
+        fetchSystemStatus(),
+        fetchWebSocketStatus()
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const formatBytes = (bytes) => {
     if (bytes === 0) return '0 Bytes';
-    
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+  
+  const getLogSeverityColor = (severity) => {
+    switch (severity.toLowerCase()) {
+      case 'error':
+        return theme.palette.error.main;
+      case 'warning':
+        return theme.palette.warning.main;
+      case 'info':
+        return theme.palette.info.main;
+      case 'debug':
+        return theme.palette.grey[500];
+      default:
+        return theme.palette.success.main;
+    }
+  };
+  
+  const getLogSeverityIcon = (severity) => {
+    switch (severity.toLowerCase()) {
+      case 'error':
+        return <Error fontSize="small" />;
+      case 'warning':
+        return <Warning fontSize="small" />;
+      case 'info':
+        return <Info fontSize="small" />;
+      case 'debug':
+        return <Computer fontSize="small" />;
+      default:
+        return <CheckCircle fontSize="small" />;
+    }
   };
 
   // Prepare chart data for API response times
   const responseTimeData = {
-    labels: systemStatus?.apiResponseTimes.map(item => moment(item.timestamp).format('HH:mm')) || [],
+    labels: Array.isArray(systemStatus?.apiResponseTimes) 
+      ? systemStatus.apiResponseTimes.map(item => moment(item.timestamp).format('HH:mm')) 
+      : [],
     datasets: [
       {
         label: 'API Response Time (ms)',
-        data: systemStatus?.apiResponseTimes.map(item => item.responseTime) || [],
+        data: Array.isArray(systemStatus?.apiResponseTimes) 
+          ? systemStatus.apiResponseTimes.map(item => item.responseTime) 
+          : [],
         borderColor: theme.palette.primary.main,
         backgroundColor: theme.palette.primary.light,
         tension: 0.4,
@@ -132,24 +264,33 @@ const SystemStatus = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
+        <VeggieLoader message="Loading system status..." />
       </Box>
     );
   }
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        mb: 4,
+        gap: isMobile ? 2 : 0
+      }}>
         <Typography variant="h4" component="h1">
           System Status
         </Typography>
         <Button
-          variant="outlined"
-          startIcon={refreshing ? <CircularProgress size={20} /> : <Refresh />}
+          variant="contained"
+          color="primary"
+          startIcon={refreshing ? <VeggieLoader size="small" /> : <Refresh />}
           onClick={handleRefresh}
           disabled={refreshing}
+          sx={{ px: 3 }}
         >
-          {refreshing ? 'Refreshing...' : 'Refresh Status'}
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
       </Box>
       
@@ -159,7 +300,7 @@ const SystemStatus = () => {
         </Alert>
       )}
       
-      <Grid container spacing={3}>
+      <Grid container spacing={isMobile ? 2 : 3}>
         {/* LM Studio API Status */}
         <Grid item xs={12} md={6}>
           <Card>
@@ -175,13 +316,13 @@ const SystemStatus = () => {
               <List>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: systemStatus?.llm.online ? theme.palette.success.main : theme.palette.error.main }}>
-                      {systemStatus?.llm.online ? <CheckCircle /> : <Error />}
+                    <Avatar sx={{ bgcolor: systemStatus?.llm?.online ? theme.palette.success.main : theme.palette.error.main }}>
+                      {systemStatus?.llm?.online ? <CheckCircle /> : <Error />}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary="Connection Status"
-                    secondary={systemStatus?.llm.online ? 'Online' : 'Offline'}
+                    secondary={systemStatus?.llm?.online ? 'Online' : 'Offline'}
                   />
                 </ListItem>
                 
@@ -193,7 +334,7 @@ const SystemStatus = () => {
                   </ListItemAvatar>
                   <ListItemText
                     primary="Active Model"
-                    secondary={systemStatus?.llm.model || 'Unknown'}
+                    secondary={systemStatus?.llm?.model || 'Unknown'}
                   />
                 </ListItem>
                 
@@ -205,7 +346,7 @@ const SystemStatus = () => {
                   </ListItemAvatar>
                   <ListItemText
                     primary="Average Response Time"
-                    secondary={`${systemStatus?.llm.avgResponseTime || 'N/A'} ms`}
+                    secondary={`${systemStatus?.llm?.avgResponseTime || 'N/A'} ms`}
                   />
                 </ListItem>
                 
@@ -217,15 +358,15 @@ const SystemStatus = () => {
                   </ListItemAvatar>
                   <ListItemText
                     primary="Last Checked"
-                    secondary={systemStatus?.llm.lastChecked ? moment(systemStatus.llm.lastChecked).format('MMMM D, YYYY [at] h:mm:ss A') : 'Never'}
+                    secondary={systemStatus?.llm?.lastChecked ? moment(systemStatus?.llm?.lastChecked).format('MMMM D, YYYY [at] h:mm:ss A') : 'Never'}
                   />
                 </ListItem>
               </List>
               
-              {systemStatus?.llm.error && (
+              {systemStatus?.llm?.error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
                   <Typography variant="subtitle2">Error Message:</Typography>
-                  <Typography variant="body2">{systemStatus.llm.error}</Typography>
+                  <Typography variant="body2">{systemStatus?.llm?.error}</Typography>
                 </Alert>
               )}
               
@@ -280,16 +421,16 @@ const SystemStatus = () => {
                   <Box sx={{ flexGrow: 1, mr: 2 }}>
                     <LinearProgress
                       variant="determinate"
-                      value={systemStatus?.resources.memory.usedPercent || 0}
+                      value={systemStatus?.resources?.memory?.usedPercent || 0}
                       sx={{ height: 10, borderRadius: 5 }}
                     />
                   </Box>
                   <Typography variant="body2">
-                    {systemStatus?.resources.memory.usedPercent || 0}%
+                    {systemStatus?.resources?.memory?.usedPercent || 0}%
                   </Typography>
                 </Box>
                 <Typography variant="caption" color="textSecondary">
-                  {formatBytes(systemStatus?.resources.memory.used || 0)} / {formatBytes(systemStatus?.resources.memory.total || 0)}
+                  {formatBytes(systemStatus?.resources?.memory?.used || 0)} / {formatBytes(systemStatus?.resources?.memory?.total || 0)}
                 </Typography>
               </Box>
               
@@ -301,16 +442,16 @@ const SystemStatus = () => {
                   <Box sx={{ flexGrow: 1, mr: 2 }}>
                     <LinearProgress
                       variant="determinate"
-                      value={systemStatus?.resources.disk.usedPercent || 0}
+                      value={systemStatus?.resources?.disk?.usedPercent || 0}
                       sx={{ height: 10, borderRadius: 5 }}
                     />
                   </Box>
                   <Typography variant="body2">
-                    {systemStatus?.resources.disk.usedPercent || 0}%
+                    {systemStatus?.resources?.disk?.usedPercent || 0}%
                   </Typography>
                 </Box>
                 <Typography variant="caption" color="textSecondary">
-                  {formatBytes(systemStatus?.resources.disk.used || 0)} / {formatBytes(systemStatus?.resources.disk.total || 0)}
+                  {formatBytes(systemStatus?.resources?.disk?.used || 0)} / {formatBytes(systemStatus?.resources?.disk?.total || 0)}
                 </Typography>
               </Box>
               
@@ -319,9 +460,44 @@ const SystemStatus = () => {
                   System Uptime
                 </Typography>
                 <Typography variant="body2">
-                  {systemStatus?.resources.uptime || 'Unknown'}
+                  {systemStatus?.resources?.uptime || 'Unknown'}
                 </Typography>
               </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* WebSocket Workers */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                mb: 1 
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <DeviceHub sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6">WebSocket Workers</Typography>
+                </Box>
+                <IconButton onClick={() => toggleSection('workers')}>
+                  {expandedSections.workers ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+              
+              <Collapse in={expandedSections.workers} timeout="auto">
+                <Box sx={{ mt: 2 }}>
+                  <WebSocketWorkerManager 
+                    workers={wsStatus?.workers || []} 
+                    isLoading={loading || refreshing} 
+                    onRefresh={fetchWebSocketStatus}
+                    onStartWorker={handleStartWorker}
+                    onStopWorker={handleStopWorker}
+                    onRestartWorker={handleRestartWorker}
+                  />
+                </Box>
+              </Collapse>
             </CardContent>
           </Card>
         </Grid>
@@ -341,13 +517,13 @@ const SystemStatus = () => {
               <List>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: systemStatus?.database.connected ? theme.palette.success.main : theme.palette.error.main }}>
-                      {systemStatus?.database.connected ? <CheckCircle /> : <Error />}
+                    <Avatar sx={{ bgcolor: systemStatus?.database?.connected ? theme.palette.success.main : theme.palette.error.main }}>
+                      {systemStatus?.database?.connected ? <CheckCircle /> : <Error />}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary="Connection Status"
-                    secondary={systemStatus?.database.connected ? 'Connected' : 'Disconnected'}
+                    secondary={systemStatus?.database?.connected ? 'Connected' : 'Disconnected'}
                   />
                 </ListItem>
                 
@@ -359,7 +535,7 @@ const SystemStatus = () => {
                   </ListItemAvatar>
                   <ListItemText
                     primary="Database Size"
-                    secondary={formatBytes(systemStatus?.database.size || 0)}
+                    secondary={formatBytes(systemStatus?.database?.size || 0)}
                   />
                 </ListItem>
               </List>
@@ -473,12 +649,61 @@ const SystemStatus = () => {
           </Card>
         </Grid>
         
-        {/* API Response Times Chart */}
+        {/* WebSocket Workers */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Box sx={{ height: 400, position: 'relative' }}>
-                {systemStatus?.apiResponseTimes && systemStatus.apiResponseTimes.length > 0 ? (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                mb: 1 
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <DeviceHub sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6">WebSocket Workers</Typography>
+                </Box>
+                <IconButton onClick={() => toggleSection('workers')}>
+                  {expandedSections.workers ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+              
+              <Collapse in={expandedSections.workers} timeout="auto">
+                <Box sx={{ mt: 2 }}>
+                  <WebSocketWorkerManager 
+                    workers={wsStatus?.workers || []} 
+                    isLoading={loading || refreshing} 
+                    onRefresh={fetchWebSocketStatus}
+                    onStartWorker={handleStartWorker}
+                    onStopWorker={handleStopWorker}
+                    onRestartWorker={handleRestartWorker}
+                  />
+                </Box>
+              </Collapse>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* API Response Times Chart */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Speed sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6">
+                    API Response Times
+                  </Typography>
+                </Box>
+                <IconButton onClick={() => toggleSection('apiResponse')} size="small">
+                  {expandedSections.apiResponse ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+              <Divider sx={{ mb: 2 }} />
+              
+              <Collapse in={expandedSections.apiResponse}>
+                <Box sx={{ height: isMobile ? 300 : 400, position: 'relative' }}>
+                {Array.isArray(systemStatus?.apiResponseTimes) && systemStatus.apiResponseTimes.length > 0 ? (
                   <Line data={responseTimeData} options={chartOptions} />
                 ) : (
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -487,7 +712,8 @@ const SystemStatus = () => {
                     </Typography>
                   </Box>
                 )}
-              </Box>
+                </Box>
+              </Collapse>
             </CardContent>
           </Card>
         </Grid>
@@ -495,7 +721,7 @@ const SystemStatus = () => {
         {/* System Logs */}
         <Grid item xs={12}>
           <Card>
-            <CardContent>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Memory sx={{ mr: 1, color: theme.palette.primary.main }} />
@@ -503,62 +729,46 @@ const SystemStatus = () => {
                     Recent System Logs
                   </Typography>
                 </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                >
-                  View All Logs
-                </Button>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={{ mr: 1, display: { xs: 'none', sm: 'flex' } }}
+                  >
+                    View All Logs
+                  </Button>
+                  <IconButton onClick={() => toggleSection('systemLogs')} size="small">
+                    {expandedSections.systemLogs ? <ExpandLess /> : <ExpandMore />}
+                  </IconButton>
+                </Box>
               </Box>
               <Divider sx={{ mb: 2 }} />
               
-              {systemStatus?.logs && systemStatus.logs.length > 0 ? (
-                <List>
-                  {systemStatus.logs.map((log, index) => (
-                    <ListItem key={index} divider={index < systemStatus.logs.length - 1}>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 
-                          log.level === 'error' ? theme.palette.error.main :
-                          log.level === 'warn' ? theme.palette.warning.main :
-                          log.level === 'info' ? theme.palette.info.main :
-                          theme.palette.success.main
-                        }}>
-                          {log.level === 'error' ? <Error /> :
-                           log.level === 'warn' ? <Warning /> :
-                           <CheckCircle />}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="subtitle2">
-                              {log.message}
-                            </Typography>
-                            <Chip
-                              label={log.level.toUpperCase()}
-                              size="small"
-                              color={
-                                log.level === 'error' ? 'error' :
-                                log.level === 'warn' ? 'warning' :
-                                log.level === 'info' ? 'info' :
-                                'success'
-                              }
-                              sx={{ ml: 1 }}
-                            />
-                          </Box>
-                        }
-                        secondary={`${moment(log.timestamp).format('MMMM D, YYYY [at] h:mm:ss A')} • ${log.source}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Box sx={{ py: 4, textAlign: 'center' }}>
-                  <Typography variant="body1" color="textSecondary">
-                    No recent logs available
-                  </Typography>
-                </Box>
-              )}
+              <Collapse in={expandedSections.systemLogs}>
+                {Array.isArray(systemStatus?.logs) && systemStatus.logs.length > 0 ? (
+                  <List dense={isMobile}>
+                    {systemStatus.logs.map((log, index) => (
+                      <ListItem key={index} divider={index < systemStatus.logs.length - 1}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: getLogSeverityColor(log?.severity || 'info') }}>
+                            {getLogSeverityIcon(log?.severity || 'info')}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={log?.message || 'No message'}
+                          secondary={`${log?.source || 'Unknown'} • ${moment(log?.timestamp || new Date()).format('YYYY-MM-DD HH:mm:ss')}`}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                    <Typography variant="body1" color="textSecondary">
+                      No system logs available
+                    </Typography>
+                  </Box>
+                )}
+              </Collapse>
             </CardContent>
           </Card>
         </Grid>

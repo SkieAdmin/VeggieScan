@@ -14,7 +14,8 @@ import {
   ListItemAvatar,
   Avatar,
   CircularProgress,
-  Paper
+  Paper,
+  useMediaQuery
 } from '@mui/material';
 import {
   CameraAlt,
@@ -25,19 +26,22 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useTheme } from '@mui/material/styles';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import moment from 'moment';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, ChartTooltip, Legend);
 
 const Dashboard = () => {
+  // Define all hooks at the top level
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+  // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -56,6 +60,7 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
+  // Define chart data and options
   const chartData = {
     labels: ['Safe to Eat', 'Unsafe to Eat'],
     datasets: [
@@ -91,7 +96,8 @@ const Dashboard = () => {
     },
     cutout: '70%'
   };
-
+  
+  // Loading state
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -102,14 +108,23 @@ const Dashboard = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
+      <Box sx={{ 
+        mb: 3, 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        gap: 2
+      }}>
+        <Typography variant={isMobile ? "h5" : "h4"} component="h1">
           Dashboard
         </Typography>
         <Button
           variant="contained"
+          size={isMobile ? "small" : "medium"}
           startIcon={<CameraAlt />}
           onClick={() => navigate('/scan')}
+          fullWidth={isMobile}
         >
           Scan Vegetable
         </Button>
@@ -121,39 +136,39 @@ const Dashboard = () => {
         </Paper>
       )}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={isMobile ? 2 : 3}>
         {/* Stats Cards */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={6} md={4}>
           <Card className="dashboard-stat-card">
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+            <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
+              <Typography color="textSecondary" gutterBottom variant={isMobile ? "body2" : "body1"}>
                 Total Scans
               </Typography>
-              <Typography variant="h3" component="div" className="dashboard-stat-value">
+              <Typography variant={isMobile ? "h4" : "h3"} component="div" className="dashboard-stat-value">
                 {stats?.totalScans || 0}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={6} md={4}>
           <Card className="dashboard-stat-card" sx={{ bgcolor: theme.palette.success.light }}>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+            <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
+              <Typography color="textSecondary" gutterBottom variant={isMobile ? "body2" : "body1"}>
                 Safe Vegetables
               </Typography>
-              <Typography variant="h3" component="div" className="dashboard-stat-value">
+              <Typography variant={isMobile ? "h4" : "h3"} component="div" className="dashboard-stat-value">
                 {stats?.goodScans || 0}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={6} md={4}>
           <Card className="dashboard-stat-card" sx={{ bgcolor: theme.palette.error.light }}>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+            <CardContent sx={{ p: isMobile ? 1.5 : 2 }}>
+              <Typography color="textSecondary" gutterBottom variant={isMobile ? "body2" : "body1"}>
                 Unsafe Vegetables
               </Typography>
-              <Typography variant="h3" component="div" className="dashboard-stat-value">
+              <Typography variant={isMobile ? "h4" : "h3"} component="div" className="dashboard-stat-value">
                 {stats?.badScans || 0}
               </Typography>
             </CardContent>
@@ -161,15 +176,19 @@ const Dashboard = () => {
         </Grid>
 
         {/* Chart and Recent Scans */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
+        <Grid item xs={12} sm={6}>
+          <Card sx={{ height: '100%', minHeight: isMobile ? '250px' : '300px' }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
               <Typography variant="h6" gutterBottom>
                 Scan Results Overview
               </Typography>
-              <Box sx={{ height: 300, position: 'relative' }}>
+              <Box sx={{ height: isMobile ? 200 : 250, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
                 {stats && (stats.goodScans > 0 || stats.badScans > 0) ? (
-                  <Doughnut data={chartData} options={chartOptions} />
+                  <Doughnut data={chartData} options={{
+                    ...chartOptions,
+                    maintainAspectRatio: false,
+                    responsive: true
+                  }} />
                 ) : (
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <Typography variant="body1" color="textSecondary">
@@ -182,10 +201,17 @@ const Dashboard = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} sm={6}>
           <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <CardContent sx={{ p: isMobile ? 2 : 3 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: 'space-between', 
+                alignItems: isMobile ? 'flex-start' : 'center', 
+                mb: 2,
+                gap: 1
+              }}>
                 <Typography variant="h6">
                   Recent Scans
                 </Typography>
@@ -193,6 +219,7 @@ const Dashboard = () => {
                   endIcon={<ArrowForward />}
                   onClick={() => navigate('/history')}
                   size="small"
+                  fullWidth={isMobile}
                 >
                   View All
                 </Button>
@@ -247,19 +274,19 @@ const Dashboard = () => {
                 </Typography>
                 <Grid container spacing={2}>
                   {stats.commonVegetables.map((veg, index) => (
-                    <Grid item xs={6} sm={4} md={2} key={index}>
+                    <Grid item xs={4} sm={4} md={2} key={index}>
                       <Paper
                         elevation={1}
                         sx={{
-                          p: 2,
+                          p: isMobile ? 1 : 2,
                           textAlign: 'center',
                           bgcolor: theme.palette.background.default
                         }}
                       >
-                        <Typography variant="h5" component="div">
+                        <Typography variant={isMobile ? "h6" : "h5"} component="div">
                           {veg.count}
                         </Typography>
-                        <Typography variant="body2" color="textSecondary">
+                        <Typography variant={isMobile ? "caption" : "body2"} color="textSecondary" noWrap>
                           {veg.name}
                         </Typography>
                       </Paper>

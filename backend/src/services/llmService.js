@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { submitTask, isWebSocketEnabled } from './websocketService.js';
 
 dotenv.config();
 
@@ -11,6 +12,9 @@ dotenv.config();
 const LM_STUDIO_BASE_URL = process.env.LM_STUDIO_BASE_URL;
 const LM_STUDIO_CHAT_ENDPOINT = process.env.LM_STUDIO_CHAT_ENDPOINT;
 const LM_MODEL = process.env.LM_MODEL || 'google/gemma-3-4b'; // Default to 4B model if not specified
+
+// WebSocket configuration
+const USE_WEBSOCKET_SLAVE = process.env.USE_WEBSOCKET_SLAVE === 'true';
 
 /**
  * Check if LM Studio server is available
@@ -40,6 +44,13 @@ export const isLLMAvailable = async () => {
  */
 export const analyzeVegetableImage = async (imageUrl) => {
   try {
+    // Check if we should use WebSocket workers
+    if (USE_WEBSOCKET_SLAVE && isWebSocketEnabled()) {
+      console.log('Using WebSocket worker for image analysis');
+      return await analyzeWithWebSocketWorker(imageUrl);
+    }
+    
+    // Otherwise use direct LLM connection
     // Check if LLM is available
     const llmAvailable = await isLLMAvailable();
     
@@ -250,6 +261,240 @@ const saveToDataset = async (result) => {
   } catch (error) {
     console.error('Error saving to dataset:', error);
   }
+};
+
+/**
+ * Fallback analysis when LLM is not available
+ * @param {string} imageUrl - URL of the image to analyze
+ * @returns {Promise<Object>} Analysis result from dataset
+ */
+/**
+ * Analyze image using WebSocket worker
+ * @param {string} imageUrl - URL of the image to analyze
+ * @returns {Promise<Object>} Analysis result
+ */
+const analyzeWithWebSocketWorker = async (imageUrl) => {
+  try {
+    // Extract the image filename from the URL
+    const imageFilename = imageUrl.split('/').pop();
+    
+    // Get current file directory (ES module equivalent of __dirname)
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    
+    // Construct the path to the uploads directory (2 levels up from services directory)
+    const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+    const imagePath = path.join(uploadsDir, imageFilename);
+    
+    console.log('Looking for image at path for WebSocket worker:', imagePath);
+    
+    // Read the image file and convert to base64
+    let base64Image;
+    try {
+      const imageBuffer = fs.readFileSync(imagePath);
+      base64Image = imageBuffer.toString('base64');
+      console.log('Successfully read image and converted to base64 for WebSocket worker');
+    } catch (error) {
+      console.error('Error reading image file for WebSocket worker:', error);
+      throw new Error(`Could not read image file: ${error.message}`);
+    }
+    
+    // Prepare the prompt for LLM
+    const prompt = `You're a VeggieScan: Visual Diagnosis of Vegetable Freshness and Contamination AI Assistant. Analyze the provided image and identify if it contains vegetables. Always return your response in JSON format.
+
+If the image contains vegetables, provide:
+- Vegetable Name
+- Safe to Eat: true or false
+- Disease Name (if applicable, or null)
+- Recommendation
+
+If the image is damaged/cut, add "(Proned to Bacteria)" to the vegetable name.
+
+If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.`;
+    
+    // Submit task to WebSocket server
+    const result = await submitTask('analyze_image', {
+      imageBase64: base64Image,
+      prompt: prompt,
+      model: LM_MODEL
+    });
+    
+    console.log('Received result from WebSocket worker:', result);
+    
+    // Save the result to the dataset for future use
+    await saveToDataset(result);
+    
+    return result;
+  } catch (error) {
+    console.error('Error analyzing with WebSocket worker:', error);
+    console.log('Falling back to direct LLM analysis');
+    
+    // Disable WebSocket for this request and try direct LLM
+    const tempUseWebSocket = USE_WEBSOCKET_SLAVE;
+    process.env.USE_WEBSOCKET_SLAVE = 'false';
+    
+    try {
+      // Check if LLM is available locally
+      const llmAvailable = await isLLMAvailable();
+      
+      if (!llmAvailable) {
+        console.warn('LLM is not available. Using dataset for fallback analysis.');
+        return await fallbackAnalysis(imageUrl);
+      }
+      
+      // Use the original analyzeVegetableImage logic but skip the WebSocket check
+      // This is a simplified version to avoid code duplication
+      const result = await analyzeWithDirectLLM(imageUrl);
+      return result;
+    } finally {
+      // Restore the original setting
+      process.env.USE_WEBSOCKET_SLAVE = tempUseWebSocket ? 'true' : 'false';
+    }
+  }
+};
+
+/**
+ * Analyze image directly with LLM (no WebSocket)
+ * This is a helper function to avoid code duplication
+ * @param {string} imageUrl - URL of the image to analyze
+ * @returns {Promise<Object>} Analysis result
+ */
+const analyzeWithDirectLLM = async (imageUrl) => {
+  // Extract the image filename from the URL
+  const imageFilename = imageUrl.split('/').pop();
+  
+  // Get current file directory (ES module equivalent of __dirname)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
+  // Construct the path to the uploads directory (2 levels up from services directory)
+  const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+  const imagePath = path.join(uploadsDir, imageFilename);
+  
+  console.log('Looking for image at path:', imagePath);
+  
+  // Read the image file and convert to base64
+  let base64Image;
+  try {
+    const imageBuffer = fs.readFileSync(imagePath);
+    base64Image = imageBuffer.toString('base64');
+    console.log('Successfully read image and converted to base64');
+  } catch (error) {
+    console.error('Error reading image file:', error);
+    throw new Error(`Could not read image file: ${error.message}`);
+  }
+  
+  // Prepare the prompt for LLM
+  const prompt = `You're a VeggieScan: Visual Diagnosis of Vegetable Freshness and Contamination AI Assistant. Analyze the provided image and identify if it contains vegetables. Always return your response in JSON format.
+
+If the image contains vegetables, provide:
+- Vegetable Name
+- Safe to Eat: true or false
+- Disease Name (if applicable, or null)
+- Recommendation
+
+If the image is damaged/cut, add "(Proned to Bacteria)" to the vegetable name.
+
+If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.`;
+  
+  // Make request to LLM Studio with base64 encoded image
+  const response = await fetch(`${LM_STUDIO_BASE_URL}${LM_STUDIO_CHAT_ENDPOINT}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: LM_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    })
+  });
+  
+  console.log('LLM request sent with base64 encoded image');
+
+  if (!response.ok) {
+    throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  // Extract the LLM response
+  const llmResponse = data.choices[0].message.content;
+  
+  // Log the raw response for debugging
+  console.log('Raw LLM response:', llmResponse);
+  
+  // Parse the JSON response from the LLM
+  // The LLM might return a formatted response, so we need to extract just the JSON part
+  const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
+  
+  if (!jsonMatch) {
+    console.error('No JSON found in response:', llmResponse);
+    throw new Error('Failed to extract JSON from LLM response');
+  }
+  
+  let parsedResponse;
+  try {
+    parsedResponse = JSON.parse(jsonMatch[0]);
+    console.log('Successfully parsed JSON response:', parsedResponse);
+  } catch (error) {
+    console.error('Error parsing LLM JSON response:', error);
+    // Try to extract the data manually if JSON parsing fails
+    parsedResponse = extractDataFromText(llmResponse);
+    console.log('Extracted data from text:', parsedResponse);
+  }
+
+  // Log the parsed response for debugging
+  console.log('Parsed response before formatting:', parsedResponse);
+  
+  // Format the response with case-insensitive field matching
+  const result = {
+    vegetableName: parsedResponse.vegetableName || 
+                  parsedResponse['Vegetable Name'] || 
+                  parsedResponse['vegetableName'] || 
+                  parsedResponse['VegetableName'] || 
+                  'Unknown',
+    safeToEat: parsedResponse.safeToEat === true || 
+              parsedResponse['Safe to Eat'] === true || 
+              parsedResponse['SafeToEat'] === true || 
+              parsedResponse['safeToEat'] === true || 
+              String(parsedResponse.SafeToEat).toLowerCase() === 'true' ||
+              String(parsedResponse['Safe to Eat']).toLowerCase() === 'true',
+    diseaseName: parsedResponse.diseaseName || 
+                parsedResponse['Disease Name'] || 
+                parsedResponse['DiseaseName'] || 
+                parsedResponse['diseaseName'] || 
+                null,
+    recommendation: parsedResponse.recommendation || 
+                   parsedResponse['Recommendation'] || 
+                   parsedResponse['recommendation'] || 
+                   'No recommendation available.'
+  };
+  
+  // Log the final formatted result
+  console.log('Formatted result:', result);
+
+  // Save the result to the dataset for future use
+  await saveToDataset(result);
+
+  return result;
 };
 
 /**

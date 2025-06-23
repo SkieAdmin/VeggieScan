@@ -3,6 +3,8 @@ import { prisma } from '../index.js';
 import { authenticate, adminOnly } from '../middleware/auth.js';
 import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
+import { getWebSocketStatus } from '../services/websocketService.js';
 
 const router = express.Router();
 
@@ -421,6 +423,47 @@ router.get('/system/status', async (req, res, next) => {
         vegetableName: scan.vegetableName,
         isSafe: scan.isSafe,
         createdAt: scan.createdAt
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/admin/websocket/status
+ * @desc    Get WebSocket worker status (admin only)
+ * @access  Private/Admin
+ */
+router.get('/websocket/status', async (req, res, next) => {
+  try {
+    const useWebSocketSlave = process.env.USE_WEBSOCKET_SLAVE === 'true';
+    
+    if (!useWebSocketSlave) {
+      return res.json({
+        enabled: false,
+        message: 'WebSocket worker mode is not enabled. Set USE_WEBSOCKET_SLAVE=true to enable it.'
+      });
+    }
+    
+    // Get WebSocket status from the service
+    const status = getWebSocketStatus();
+    
+    res.json({
+      enabled: true,
+      port: process.env.WEBSOCKET_PORT || 3002,
+      connectedClients: status.clients.length,
+      activeWorkers: status.clients.filter(client => client.status === 'ready').length,
+      busyWorkers: status.clients.filter(client => client.status === 'busy').length,
+      queuedTasks: status.taskQueue.length,
+      activeTasks: status.activeTasks.length,
+      clients: status.clients.map(client => ({
+        id: client.id,
+        status: client.status,
+        capabilities: client.capabilities,
+        connectedSince: client.connectedAt,
+        tasks: client.tasks.length,
+        lastPing: client.lastPing
       }))
     });
   } catch (error) {

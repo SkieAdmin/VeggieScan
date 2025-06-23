@@ -1,12 +1,17 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { CssBaseline, Box } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
 import { useAuth } from './contexts/AuthContext';
-import { useTheme } from './contexts/ThemeContext';
+// Import our custom theme
+import theme from './theme';
 
 // Layouts
-import MainLayout from './layouts/MainLayout';
+import ResponsiveLayout from './components/layout/ResponsiveLayout';
 import AuthLayout from './layouts/AuthLayout';
+
+// Common Components
+import VeggieLoader from './components/common/VeggieLoader';
 
 // Public Pages
 import Login from './pages/auth/Login';
@@ -31,12 +36,15 @@ import AdminSettings from './pages/admin/AdminSettings';
 
 function App() {
   const { currentUser, loading } = useAuth();
-  const { theme } = useTheme();
 
   // Protected route component
   const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (loading) {
-      return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</Box>;
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: 'background.default' }}>
+          <VeggieLoader message="Loading VeggieScan..." size="large" />
+        </Box>
+      );
     }
     
     if (!currentUser) {
@@ -51,7 +59,7 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <Routes>
         {/* Auth Routes */}
@@ -61,7 +69,7 @@ function App() {
         </Route>
 
         {/* User Routes */}
-        <Route element={<MainLayout />}>
+        <Route element={<ResponsiveLayout user={currentUser}><Outlet /></ResponsiveLayout>}>
           <Route path="/" element={<Navigate to={currentUser ? "/dashboard" : "/login"} />} />
           
           <Route path="/dashboard" element={
@@ -141,7 +149,7 @@ function App() {
         {/* 404 Route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </div>
+    </ThemeProvider>
   );
 }
 
