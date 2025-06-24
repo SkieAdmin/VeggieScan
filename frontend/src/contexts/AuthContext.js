@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState('');
 
   // Configure axios defaults
-  axios.defaults.baseURL = 'http://localhost:3001/api';
+  axios.defaults.baseURL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:3001/api';
 
   // Add token to all requests if available
   axios.interceptors.request.use(
