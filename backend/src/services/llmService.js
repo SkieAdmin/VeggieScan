@@ -67,10 +67,25 @@ If the image contains vegetables, provide:
 - Safe to Eat: true or false
 - Disease Name (if applicable, or null)
 - Recommendation
+- Freshness Level: one of "GOOD", "ACCEPTABLE", or "NOT_RECOMMENDED"
+  * GOOD: Fresh, ideal for consumption (bright colors, firm texture, no spots)
+  * ACCEPTABLE: Still safe, but not optimal (slight discoloration, minor soft spots)
+  * NOT_RECOMMENDED: Stale or spoiled, avoid use (significant decay, mold, bad odor signs)
+- Freshness Score: a number from 0-100 (100 being perfectly fresh, 0 being completely spoiled)
 
 If the image is damaged/cut, add "(Proned to Bacteria)" to the vegetable name.
 
-If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.`;
+If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.
+
+Example response format:
+{
+  "vegetableName": "Tomato",
+  "safeToEat": true,
+  "diseaseName": null,
+  "recommendation": "Fresh tomato, good for consumption",
+  "freshnessLevel": "GOOD",
+  "freshnessScore": 85
+}`;
 
     // Debug log to track the process
     console.log('Starting LLM analysis for image:', imageUrl);
@@ -187,7 +202,13 @@ If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and expl
       recommendation: parsedResponse.recommendation || 
                      parsedResponse['Recommendation'] || 
                      parsedResponse['recommendation'] || 
-                     'No recommendation available.'
+                     'No recommendation available.',
+      freshnessLevel: parsedResponse.freshnessLevel || 
+                     parsedResponse['Freshness Level'] || 
+                     'Unknown',
+      freshnessScore: parsedResponse.freshnessScore || 
+                     parsedResponse['Freshness Score'] || 
+                     0
     };
     
     // Log the final formatted result
@@ -240,6 +261,18 @@ const extractDataFromText = (text) => {
     result.recommendation = recommendationMatch[1].trim();
   }
   
+  // Extract freshness level
+  const freshnessLevelMatch = text.match(/Freshness Level:?\s*(GOOD|ACCEPTABLE|NOT_RECOMMENDED)/i);
+  if (freshnessLevelMatch) {
+    result.freshnessLevel = freshnessLevelMatch[1].trim();
+  }
+  
+  // Extract freshness score
+  const freshnessScoreMatch = text.match(/Freshness Score:?\s*(\d+)/i);
+  if (freshnessScoreMatch) {
+    result.freshnessScore = parseInt(freshnessScoreMatch[1].trim());
+  }
+  
   return result;
 };
 
@@ -255,6 +288,8 @@ const saveToDataset = async (result) => {
         isSafe: result.safeToEat,
         diseaseName: result.diseaseName,
         recommendation: result.recommendation,
+        freshnessLevel: result.freshnessLevel,
+        freshnessScore: result.freshnessScore,
         imagePath: null // We don't have the image path here
       }
     });
@@ -307,10 +342,25 @@ If the image contains vegetables, provide:
 - Safe to Eat: true or false
 - Disease Name (if applicable, or null)
 - Recommendation
+- Freshness Level: one of "GOOD", "ACCEPTABLE", or "NOT_RECOMMENDED"
+  * GOOD: Fresh, ideal for consumption (bright colors, firm texture, no spots)
+  * ACCEPTABLE: Still safe, but not optimal (slight discoloration, minor soft spots)
+  * NOT_RECOMMENDED: Stale or spoiled, avoid use (significant decay, mold, bad odor signs)
+- Freshness Score: a number from 0-100 (100 being perfectly fresh, 0 being completely spoiled)
 
 If the image is damaged/cut, add "(Proned to Bacteria)" to the vegetable name.
 
-If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.`;
+If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.
+
+Example response format:
+{
+  "vegetableName": "Tomato",
+  "safeToEat": true,
+  "diseaseName": null,
+  "recommendation": "Fresh tomato, good for consumption",
+  "freshnessLevel": "GOOD",
+  "freshnessScore": 85
+}`;
     
     // Submit task to WebSocket server
     const result = await submitTask('analyze_image', {
@@ -392,10 +442,25 @@ If the image contains vegetables, provide:
 - Safe to Eat: true or false
 - Disease Name (if applicable, or null)
 - Recommendation
+- Freshness Level: one of "GOOD", "ACCEPTABLE", or "NOT_RECOMMENDED"
+  * GOOD: Fresh, ideal for consumption (bright colors, firm texture, no spots)
+  * ACCEPTABLE: Still safe, but not optimal (slight discoloration, minor soft spots)
+  * NOT_RECOMMENDED: Stale or spoiled, avoid use (significant decay, mold, bad odor signs)
+- Freshness Score: a number from 0-100 (100 being perfectly fresh, 0 being completely spoiled)
 
 If the image is damaged/cut, add "(Proned to Bacteria)" to the vegetable name.
 
-If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.`;
+If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and explain why it's not a vegetable.
+
+Example response format:
+{
+  "vegetableName": "Tomato",
+  "safeToEat": true,
+  "diseaseName": null,
+  "recommendation": "Fresh tomato, good for consumption",
+  "freshnessLevel": "GOOD",
+  "freshnessScore": 85
+}`;
   
   // Make request to LLM Studio with base64 encoded image
   const response = await fetch(`${LM_STUDIO_BASE_URL}${LM_STUDIO_CHAT_ENDPOINT}`, {
@@ -485,7 +550,13 @@ If the image is NOT a vegetable, set "vegetableName" to "invalid_image" and expl
     recommendation: parsedResponse.recommendation || 
                    parsedResponse['Recommendation'] || 
                    parsedResponse['recommendation'] || 
-                   'No recommendation available.'
+                   'No recommendation available.',
+    freshnessLevel: parsedResponse.freshnessLevel || 
+                   parsedResponse['Freshness Level'] || 
+                   'Unknown',
+    freshnessScore: parsedResponse.freshnessScore || 
+                   parsedResponse['Freshness Score'] || 
+                   0
   };
   
   // Log the final formatted result
@@ -511,7 +582,9 @@ const fallbackAnalysis = async (imageUrl) => {
       vegetableName: 'Analysis Failed',
       safeToEat: false,
       diseaseName: null,
-      recommendation: 'Unable to analyze image with LLM. Please try again later or contact support.'
+      recommendation: 'Unable to analyze image with LLM. Please try again later or contact support.',
+      freshnessLevel: 'Unknown',
+      freshnessScore: 0
     };
     
     /* Disabling random dataset selection as it's causing confusion
@@ -538,7 +611,9 @@ const fallbackAnalysis = async (imageUrl) => {
         vegetableName: 'Unknown',
         safeToEat: false,
         diseaseName: null,
-        recommendation: 'Unable to analyze image. LLM is unavailable and no dataset exists for fallback.'
+        recommendation: 'Unable to analyze image. LLM is unavailable and no dataset exists for fallback.',
+        freshnessLevel: 'Unknown',
+        freshnessScore: 0
       };
     }
     
@@ -556,7 +631,9 @@ const fallbackAnalysis = async (imageUrl) => {
       vegetableName: randomEntry.vegetableName,
       safeToEat: randomEntry.isSafe,
       diseaseName: randomEntry.diseaseName,
-      recommendation: randomEntry.recommendation + ' (NOTE: LLM is unavailable. This analysis is based on historical data and may not be accurate for your specific image.)'
+      recommendation: randomEntry.recommendation + ' (NOTE: LLM is unavailable. This analysis is based on historical data and may not be accurate for your specific image.)',
+      freshnessLevel: randomEntry.freshnessLevel,
+      freshnessScore: randomEntry.freshnessScore
     };
     */
   } catch (error) {
@@ -565,7 +642,9 @@ const fallbackAnalysis = async (imageUrl) => {
       vegetableName: 'Error',
       safeToEat: false,
       diseaseName: null,
-      recommendation: 'Unable to analyze image. LLM is unavailable and fallback analysis failed.'
+      recommendation: 'Unable to analyze image. LLM is unavailable and fallback analysis failed.',
+      freshnessLevel: 'Unknown',
+      freshnessScore: 0
     };
   }
 };

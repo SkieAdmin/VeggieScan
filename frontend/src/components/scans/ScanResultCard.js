@@ -19,7 +19,9 @@ import {
   Info, 
   Delete, 
   Share, 
-  Download
+  Download,
+  Eco,
+  Cancel
 } from '@mui/icons-material';
 import moment from 'moment';
 import { Link } from 'react-router-dom';
@@ -28,18 +30,56 @@ const ScanResultCard = ({ scan, onDelete, onShare, onDownload }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  // Helper function to determine freshness color
-  const getFreshnessColor = (freshness) => {
-    if (freshness >= 80) return theme.palette.success.main;
-    if (freshness >= 50) return theme.palette.warning.main;
-    return theme.palette.error.main;
+  // Helper function to determine freshness color based on level
+  const getFreshnessColor = (freshnessLevel) => {
+    switch (freshnessLevel) {
+      case 'GOOD':
+        return theme.palette.success.main;
+      case 'ACCEPTABLE':
+        return theme.palette.warning.main;
+      case 'NOT_RECOMMENDED':
+        return theme.palette.error.main;
+      default:
+        return theme.palette.grey.main;
+    }
   };
   
-  // Helper function to determine freshness icon
-  const getFreshnessIcon = (freshness) => {
-    if (freshness >= 80) return <CheckCircle fontSize="small" />;
-    if (freshness >= 50) return <Warning fontSize="small" />;
-    return <Error fontSize="small" />;
+  // Helper function to determine freshness icon based on level
+  const getFreshnessIcon = (freshnessLevel) => {
+    switch (freshnessLevel) {
+      case 'GOOD':
+        return <Eco fontSize="small" />;
+      case 'ACCEPTABLE':
+        return <Warning fontSize="small" />;
+      case 'NOT_RECOMMENDED':
+        return <Cancel fontSize="small" />;
+      default:
+        return <Info fontSize="small" />;
+    }
+  };
+
+  // Helper function to get freshness label
+  const getFreshnessLabel = (freshnessLevel, freshnessScore) => {
+    const score = freshnessScore || 0;
+    switch (freshnessLevel) {
+      case 'GOOD':
+        return `Fresh (${score}%)`;
+      case 'ACCEPTABLE':
+        return `Fair (${score}%)`;
+      case 'NOT_RECOMMENDED':
+        return `Poor (${score}%)`;
+      default:
+        return 'Unknown';
+    }
+  };
+
+  // Helper function to get safety status
+  const getSafetyStatus = (isSafe) => {
+    return {
+      label: isSafe ? 'Safe to Eat' : 'Not Safe',
+      color: isSafe ? theme.palette.success.main : theme.palette.error.main,
+      icon: isSafe ? <CheckCircle fontSize="small" /> : <Error fontSize="small" />
+    };
   };
   
   // Helper function to format date
@@ -52,6 +92,8 @@ const ScanResultCard = ({ scan, onDelete, onShare, onDownload }) => {
     if (!text) return '';
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
+
+  const safetyStatus = getSafetyStatus(scan.isSafe);
   
   return (
     <Card 
@@ -84,40 +126,55 @@ const ScanResultCard = ({ scan, onDelete, onShare, onDownload }) => {
               {scan.vegetableName || 'Unknown Vegetable'}
             </Typography>
             
-            <Chip
-              icon={getFreshnessIcon(scan.freshness)}
-              label={`${scan.freshness}% Fresh`}
-              size="small"
-              sx={{
-                bgcolor: `${getFreshnessColor(scan.freshness)}22`,
-                color: getFreshnessColor(scan.freshness),
-                fontWeight: 'medium',
-                '& .MuiChip-icon': {
-                  color: 'inherit',
-                },
-              }}
-            />
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {/* Freshness Level Chip */}
+              <Chip
+                icon={getFreshnessIcon(scan.freshnessLevel)}
+                label={getFreshnessLabel(scan.freshnessLevel, scan.freshnessScore)}
+                size="small"
+                sx={{
+                  bgcolor: `${getFreshnessColor(scan.freshnessLevel)}22`,
+                  color: getFreshnessColor(scan.freshnessLevel),
+                  fontWeight: 'medium',
+                  '& .MuiChip-icon': {
+                    color: 'inherit',
+                  },
+                }}
+              />
+              
+              {/* Safety Status Chip */}
+              <Chip
+                icon={safetyStatus.icon}
+                label={safetyStatus.label}
+                size="small"
+                sx={{
+                  bgcolor: `${safetyStatus.color}22`,
+                  color: safetyStatus.color,
+                  fontWeight: 'medium',
+                  '& .MuiChip-icon': {
+                    color: 'inherit',
+                  },
+                }}
+              />
+            </Box>
           </Box>
           
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {truncateText(scan.description || 'No description available', 100)}
+            {truncateText(scan.recommendation || 'No recommendation available', 100)}
           </Typography>
+
+          {scan.diseaseName && (
+            <Typography variant="body2" color="error" sx={{ mb: 1, fontWeight: 'medium' }}>
+              Disease: {scan.diseaseName}
+            </Typography>
+          )}
           
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
             <AccessTime fontSize="small" color="action" sx={{ mr: 0.5 }} />
             <Typography variant="caption" color="text.secondary">
-              {formatDate(scan.timestamp)}
+              {formatDate(scan.createdAt)}
             </Typography>
           </Box>
-          
-          {scan.contaminants && scan.contaminants.length > 0 && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" color="error" sx={{ display: 'flex', alignItems: 'center' }}>
-                <Warning fontSize="small" sx={{ mr: 0.5 }} />
-                Contaminants detected
-              </Typography>
-            </Box>
-          )}
         </CardContent>
         
         <Box sx={{ display: 'flex', alignItems: 'center', px: 2, pb: 1, mt: 'auto' }}>

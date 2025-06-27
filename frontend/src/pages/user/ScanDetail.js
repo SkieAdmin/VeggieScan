@@ -25,7 +25,8 @@ import {
   ArrowBack,
   Warning,
   BugReport,
-  Info
+  Info,
+  Spa
 } from '@mui/icons-material';
 import axios from 'axios';
 import moment from 'moment';
@@ -249,6 +250,43 @@ const ScanDetail = () => {
                         No disease detected
                       </Typography>
                     )}
+                  </Paper>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.default }}>
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Freshness Level
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                      {scan.freshnessLevel === 'GOOD' && <Spa color="success" sx={{ mr: 1 }} />}
+                      {scan.freshnessLevel === 'ACCEPTABLE' && <Warning color="warning" sx={{ mr: 1 }} />}
+                      {scan.freshnessLevel === 'NOT_RECOMMENDED' && <Cancel color="error" sx={{ mr: 1 }} />}
+                      <Chip
+                        label={
+                          scan.freshnessLevel === 'GOOD' ? 'Fresh' :
+                          scan.freshnessLevel === 'ACCEPTABLE' ? 'Fair' :
+                          scan.freshnessLevel === 'NOT_RECOMMENDED' ? 'Poor' : 'Unknown'
+                        }
+                        color={
+                          scan.freshnessLevel === 'GOOD' ? 'success' :
+                          scan.freshnessLevel === 'ACCEPTABLE' ? 'warning' :
+                          scan.freshnessLevel === 'NOT_RECOMMENDED' ? 'error' : 'default'
+                        }
+                        size="small"
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, bgcolor: theme.palette.background.default }}>
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Freshness Score
+                    </Typography>
+                    <Typography variant="h6" sx={{ mt: 1, fontWeight: 'bold' }}>
+                      {scan.freshnessScore ? `${scan.freshnessScore}%` : 'Unknown'}
+                    </Typography>
                   </Paper>
                 </Grid>
                 

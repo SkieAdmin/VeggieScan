@@ -76,7 +76,9 @@ router.post('/upload', authenticate, upload.single('image'), async (req, res, ne
         isSafe: analysisResult.safeToEat,
         diseaseName: analysisResult.diseaseName || null,
         recommendation: analysisResult.recommendation,
-        imagePath: imagePath
+        imagePath: imagePath,
+        freshnessLevel: analysisResult.freshnessLevel || 'NOT_RECOMMENDED',
+        freshnessScore: analysisResult.freshnessScore || 0
       }
     });
 
@@ -87,7 +89,9 @@ router.post('/upload', authenticate, upload.single('image'), async (req, res, ne
         isSafe: analysisResult.safeToEat,
         diseaseName: analysisResult.diseaseName || null,
         recommendation: analysisResult.recommendation,
-        imagePath: imagePath
+        imagePath: imagePath,
+        freshnessLevel: analysisResult.freshnessLevel || 'NOT_RECOMMENDED',
+        freshnessScore: analysisResult.freshnessScore || 0
       }
     });
 
@@ -242,9 +246,36 @@ router.get('/stats/summary', authenticate, async (req, res, next) => {
       }
     });
 
+    // Count scans by freshness level
+    const freshnessCounts = await prisma.scan.groupBy({
+      by: ['freshnessLevel'],
+      where: { userId: req.user.id },
+      _count: {
+        id: true
+      }
+    });
+
     // Format the scan counts
     const goodScans = scanCounts.find(count => count.isSafe === true)?._count?.id || 0;
     const badScans = scanCounts.find(count => count.isSafe === false)?._count?.id || 0;
+
+    // Format freshness counts
+    const goodFreshness = freshnessCounts.find(count => count.freshnessLevel === 'GOOD')?._count?.id || 0;
+    const acceptableFreshness = freshnessCounts.find(count => count.freshnessLevel === 'ACCEPTABLE')?._count?.id || 0;
+    const notRecommendedFreshness = freshnessCounts.find(count => count.freshnessLevel === 'NOT_RECOMMENDED')?._count?.id || 0;
+
+    // Get average freshness score
+    const avgFreshnessResult = await prisma.scan.aggregate({
+      where: { 
+        userId: req.user.id,
+        freshnessScore: {
+          not: null
+        }
+      },
+      _avg: {
+        freshnessScore: true
+      }
+    });
 
     // Get most recent scan
     const recentScan = await prisma.scan.findFirst({
@@ -271,6 +302,12 @@ router.get('/stats/summary', authenticate, async (req, res, next) => {
       totalScans: goodScans + badScans,
       goodScans,
       badScans,
+      freshness: {
+        good: goodFreshness,
+        acceptable: acceptableFreshness,
+        notRecommended: notRecommendedFreshness,
+        averageScore: Math.round(avgFreshnessResult._avg.freshnessScore || 0)
+      },
       recentScan: recentScan ? {
         ...recentScan,
         imageUrl: `${req.protocol}://${req.get('host')}/uploads/${recentScan.imagePath}`

@@ -19,7 +19,9 @@ import {
   CheckCircle,
   Cancel,
   WarningAmber,
-  BugReport
+  BugReport,
+  Spa,
+  Warning
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
@@ -256,12 +258,11 @@ const ScanUpload = () => {
                         {scanResult.scan.vegetableName}
                       </Typography>
                       
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
                         <Chip
                           icon={scanResult.scan.isSafe ? <CheckCircle /> : <Cancel />}
                           label={scanResult.scan.isSafe ? 'Safe to Eat' : 'Unsafe to Eat'}
                           color={scanResult.scan.isSafe ? 'success' : 'error'}
-                          sx={{ mr: 1 }}
                         />
                         
                         {scanResult.scan.diseaseName && (
@@ -271,11 +272,44 @@ const ScanUpload = () => {
                             color="warning"
                           />
                         )}
+                        
+                        <Chip
+                          icon={
+                            scanResult.scan.freshnessLevel === 'GOOD' ? <Spa /> :
+                            scanResult.scan.freshnessLevel === 'ACCEPTABLE' ? <Warning /> :
+                            <Cancel />
+                          }
+                          label={
+                            scanResult.scan.freshnessLevel === 'GOOD' ? 'Fresh' :
+                            scanResult.scan.freshnessLevel === 'ACCEPTABLE' ? 'Fair' :
+                            'Poor'
+                          }
+                          color={
+                            scanResult.scan.freshnessLevel === 'GOOD' ? 'success' :
+                            scanResult.scan.freshnessLevel === 'ACCEPTABLE' ? 'warning' :
+                            'error'
+                          }
+                        />
                       </Box>
                     </Paper>
                   </Grid>
                   
-                  <Grid item xs={12}>
+                  <Grid item xs={12} sm={6}>
+                    <Paper sx={{ p: 2, bgcolor: theme.palette.background.default }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Freshness Score
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 
+                        scanResult.scan.freshnessLevel === 'GOOD' ? theme.palette.success.main :
+                        scanResult.scan.freshnessLevel === 'ACCEPTABLE' ? theme.palette.warning.main :
+                        theme.palette.error.main
+                      }}>
+                        {scanResult.scan.freshnessScore}%
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
                     <Paper sx={{ p: 2, bgcolor: theme.palette.background.default }}>
                       <Typography variant="subtitle1" gutterBottom>
                         Recommendation:

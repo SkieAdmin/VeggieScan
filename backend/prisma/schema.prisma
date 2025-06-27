@@ -32,28 +32,38 @@ model Settings {
 }
 
 model Scan {
-  id             Int      @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   userId         Int
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   vegetableName  String
   isSafe         Boolean
   diseaseName    String?
-  recommendation String   @db.Text
+  recommendation String        @db.Text
   imagePath      String
-  createdAt      DateTime @default(now())
+  freshnessLevel FreshnessLevel @default(NOT_RECOMMENDED)
+  freshnessScore Int?          // 0-100 score for freshness
+  createdAt      DateTime      @default(now())
 }
 
 model Dataset {
-  id             Int      @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   vegetableName  String
   isSafe         Boolean
   diseaseName    String?
-  recommendation String   @db.Text
+  recommendation String        @db.Text
   imagePath      String?
-  createdAt      DateTime @default(now())
+  freshnessLevel FreshnessLevel @default(NOT_RECOMMENDED)
+  freshnessScore Int?          // 0-100 score for freshness
+  createdAt      DateTime      @default(now())
 }
 
 enum Role {
   USER
   ADMIN
+}
+
+enum FreshnessLevel {
+  GOOD              // Fresh, ideal for consumption
+  ACCEPTABLE        // Still safe, but not optimal  
+  NOT_RECOMMENDED   // Stale or spoiled, avoid use
 }

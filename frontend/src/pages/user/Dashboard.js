@@ -29,6 +29,7 @@ import { useTheme } from '@mui/material/styles';
 import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import moment from 'moment';
+import FreshnessChart from '../../components/dashboard/FreshnessChart';
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
@@ -262,6 +263,10 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6}>
+          <FreshnessChart freshnessStats={stats?.freshness} />
         </Grid>
 
         {/* Common Vegetables */}
