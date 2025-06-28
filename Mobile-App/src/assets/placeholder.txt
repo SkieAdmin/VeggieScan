@@ -1,7 +1,0 @@
-This directory will contain app assets like:
-- logo.png (app logo)
-- splash.png (splash screen image)
-- icon.png (app icon)
-- fonts (if custom fonts are used)
-
-Please add these image files to complete the app.
